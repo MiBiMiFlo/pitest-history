@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.mibimiflo</groupId>
+    <artifactId>pitest-history</artifactId>
+    <version>${revision}</version>
+    <packaging>jar</packaging>
+
+    <name>pitest-history</name>
+    <description>File-based incremental-analysis history plugin for PIT mutation testing.
+        Ports the default history implementation that was removed from pitest core after 1.16.3
+        into a standalone plugin for current pitest versions.</description>
+    <url>https://github.com/mibimiflo/pitest-history</url>
+
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>mibimiflo</id>
+            <name>Michael Weiss</name>
+            <email>michael.weiss@code2be.de</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/mibimiflo/pitest-history</url>
+        <connection>scm:git:https://github.com/mibimiflo/pitest-history.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/mibimiflo/pitest-history.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/mibimiflo/pitest-history/issues</url>
+    </issueManagement>
+
+    <properties>
+        <!-- CI-friendly version. Override on the command line with -Drevision=X.Y.Z (e.g.
+             during release: mvn -P release -Drevision=0.1.0 clean deploy). The
+             flatten-maven-plugin below substitutes the resolved value into the
+             POM that is installed/deployed, so consumers never see ${revision}. -->
+        <revision>0.1.0-SNAPSHOT</revision>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.release>11</maven.compiler.release>
+
+        <pitest.version>1.25.0</pitest.version>
+        <junit.version>4.13.2</junit.version>
+        <mockito.version>4.5.0</mockito.version>
+        <assertj.version>3.27.7</assertj.version>
+    </properties>
+
+    <dependencies>
+        <!-- SPI provided by pitest. Compile-scope because users add this plugin
+             via the pitest-maven <dependencies> block, where pitest-entry is already
+             on the tool classpath. -->
+        <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-entry</artifactId>
+            <version>${pitest.version}</version>
+        </dependency>
+
+        <!-- Test support: shared test fixtures (LocationMother, ClassInfoMother,
+             MutationTestResultMother, Project, com.example.history.*) live in pitest's
+             published test-jars. -->
+        <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest</artifactId>
+            <version>${pitest.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-entry</artifactId>
+            <version>${pitest.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Used by LocationMother / ClassInfoMother's fluent builder API in the pitest test-jar -->
+        <dependency>
+            <groupId>org.pitest.quickbuilder</groupId>
+            <artifactId>quickbuilder</artifactId>
+            <version>1.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+            </plugin>
+            <!-- Resolves ${revision} (and any other ${...}) into the installed/deployed
+                 POM so it conforms to Maven Central's strict POM rules. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <!-- oss mode resolves ${revision} and all dependency property refs
+                         (e.g. ${pitest.version}) into literal values in the deployed POM,
+                         while keeping Central-required metadata (name, description, url,
+                         licenses, scm, developers, issueManagement, ...). We have no parent
+                         POM so consumers must see fully resolved versions. -->
+                    <flattenMode>oss</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <!-- Activate with -P release for Maven Central publishing.
+                 Builds source jar, javadoc jar, GPG-signs all artifacts,
+                 and uploads via Sonatype Central Publishing. -->
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.7.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Tolerate any javadoc warnings on the small ported codebase -->
+                            <doclint>none</doclint>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.5.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+</project>

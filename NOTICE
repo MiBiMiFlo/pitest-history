@@ -1,0 +1,12 @@
+pitest-history
+Copyright 2026 Michael Weiss
+
+This product includes software developed at PIT Mutation Testing
+(https://github.com/hcoles/pitest), Copyright Henry Coles and contributors,
+licensed under the Apache License, Version 2.0.
+
+The classes under org.pitest.mutationtest.history are derived from the
+default history implementation present in pitest up to and including
+version 1.16.3, which was removed from pitest core in commit 1b87fddb1d70
+("remove default history analysis"). This project re-packages those
+classes as a standalone plugin for current pitest versions.
