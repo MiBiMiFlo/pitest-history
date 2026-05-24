@@ -31,31 +31,53 @@ Built and tested against `org.pitest:pitest-entry:1.25.0`.
 
 ## Install — Maven
 
-Add the plugin as a dependency of `pitest-maven`:
+Add `pitest-history` as a `<dependency>` of the `pitest-maven`
+plugin block. Pitest scans its plugin classpath for
+`META-INF/services` registrations and discovers `DefaultHistoryFactory`
+automatically.
 
 ```xml
-<plugin>
-    <groupId>org.pitest</groupId>
-    <artifactId>pitest-maven</artifactId>
-    <version>1.25.0</version>
-    <dependencies>
-        <dependency>
-            <groupId>io.github.mibimiflo</groupId>
-            <artifactId>pitest-history</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-    </dependencies>
-    <configuration>
-        <historyInputFile>${project.build.directory}/pitest/history.bin</historyInputFile>
-        <historyOutputFile>${project.build.directory}/pitest/history.bin</historyOutputFile>
-    </configuration>
-</plugin>
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <version>1.25.0</version>
+            <dependencies>
+                <dependency>
+                    <groupId>io.github.mibimiflo</groupId>
+                    <artifactId>pitest-history</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
+            </dependencies>
+            <configuration>
+                <historyInputFile>${project.build.directory}/pit/history.bin</historyInputFile>
+                <historyOutputFile>${project.build.directory}/pit/history.bin</historyOutputFile>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
 ```
 
-With the plugin on the classpath, the `default_history` feature
-activates automatically (it is declared `withOnByDefault(true)`).
-You can disable it explicitly with `--features=-default_history`,
-which causes pitest to fall back to its `ErroringHistoryFactory`.
+With both `<historyInputFile>` and `<historyOutputFile>` pointing at
+the same path, the second `mvn pitest:mutationCoverage` run reuses
+results from the first.
+
+### Convenience: `<withHistory>`
+
+Pitest has a built-in shortcut that picks a temp-dir history file
+for you:
+
+```xml
+<configuration>
+    <withHistory>true</withHistory>
+</configuration>
+```
+
+Same effect, but the file path is
+`${java.io.tmpdir}/<groupId>.<artifactId>.<version>_pitest_history.bin`.
+Handy for local development; the explicit-path form is better for CI
+where `target/` survives between steps but `/tmp/` may not.
 
 ## Install — Command line
 
@@ -68,6 +90,55 @@ java -cp pitest-1.25.0.jar:pitest-entry-1.25.0.jar:pitest-history-0.1.0.jar:... 
      --historyOutputLocation=history.bin \
      ...
 ```
+
+## Verifying the plugin is loaded
+
+After `mvn pitest:mutationCoverage`, the log should contain one of:
+
+```
+INFO : Will read history at .../history.bin
+INFO : Will write history to .../history.bin
+INFO : Incremental analysis reduced number of mutations by N
+```
+
+If you instead see this message, the plugin is **not** on the
+classpath — re-check the `<dependencies>` block on `pitest-maven`,
+the coordinates, and that the artifact is in a reachable repository:
+
+```
+History has been enabled but no history plugin has been installed/activated.
+If you are using https://www.arcmutate.com remember to activate the history
+plugin with +arcmutate_history
+```
+
+That's pitest's `ErroringHistoryFactory` speaking — the fallback that
+fires when no `HistoryFactory` plugin can be discovered.
+
+## Disabling temporarily
+
+The plugin's feature key is `default_history` (declared
+`withOnByDefault(true)`). To disable it for a single run without
+removing the dependency:
+
+```bash
+mvn pitest:mutationCoverage -Dfeatures="-default_history"
+```
+
+Or via POM:
+
+```xml
+<configuration>
+    <features>
+        <feature>-default_history</feature>
+    </features>
+</configuration>
+```
+
+When disabled, pitest falls back to `ErroringHistoryFactory` — so if
+you've also set `historyInputFile`/`historyOutputFile`, the build will
+fail with the "no history plugin" message. Either remove the history
+file configuration when disabling the feature, or just leave the
+feature on.
 
 ## How it works
 
