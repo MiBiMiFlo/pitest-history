@@ -1,0 +1,60 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container:
+      image: nexus-registry.p-300.com/maven-with-nodejs:3.9-eclipse-temurin-25
+    env:
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Determine release version
+        id: ver
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Releasing version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Nexus
+        # Plain `mvn deploy` (no -P release) targets the <distributionManagement>
+        # entry in pom.xml — the in-house Nexus at nexus.p-300.com. Authentication
+        # is via the NEXUS_USER / NEXUS_PASS env vars wired through the container's
+        # ~/.m2/settings.xml (server id: nexus).
+        run: mvn -B -Drevision=${{ steps.ver.outputs.version }} clean deploy | tee maven-deploy.log
+
+      - name: Upload Maven deploy log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: maven-deploy-log
+          path: maven-deploy.log
+          retention-days: 365
+
+      - name: Create Gitea release
+        if: success()
+        uses: actions/gitea-release-action@main
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: pitest-history ${{ steps.ver.outputs.version }}
+          files: |
+            target/pitest-history-*.jar

@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: nexus-registry.p-300.com/maven-with-nodejs:3.9-eclipse-temurin-25
+    env:
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Show toolchain
+        run: |
+          java -version
+          mvn -version
+
+      - name: Build and test
+        run: mvn -B clean verify | tee maven-build.log
+
+      - name: Upload Maven build log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: maven-build-log
+          path: maven-build.log
+          retention-days: 90
+
+      - name: Upload Surefire test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: surefire-reports
+          path: |
+            target/surefire-reports/*.xml
+            target/surefire-reports/*.txt
+          retention-days: 90
