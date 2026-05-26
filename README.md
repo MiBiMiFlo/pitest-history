@@ -47,7 +47,7 @@ automatically.
                 <dependency>
                     <groupId>io.github.mibimiflo</groupId>
                     <artifactId>pitest-history</artifactId>
-                    <version>0.1.0</version>
+                    <version>0.1.2</version>
                 </dependency>
             </dependencies>
             <configuration>
